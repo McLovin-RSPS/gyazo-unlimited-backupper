@@ -1,22 +1,45 @@
-# gyazo_downloader
+# gyazo-unlimited-backupper
 
-This should work with both python 2 and 3
 
-## Getting Gyazo Application Access Key
-1. Go to Gyazo's [application page](https://gyazo.com/oauth/applications)
-2. Create a new application with any name and 'http://localhost/' as the callback
-3. Click submit and then click on your new applications name which is a link
-4. Generate access key and put it in the correct location in client.yml
+Download your entire capture history from Gyazo using your session cookie with this Python script. Built to handle large volumes of images and optimized for performance using threading.
 
-## Pip install Requirements
+## Prerequisites
 
-```
-pip install -r requirements.txt
-```
+- Python 3 (this script is not tested with Python 2)
+  
+## Configuration Setup
 
-## Run the softare
+1. Ensure you have your Gyazo session cookie. This can usually be found in your browser's developer console when logged into Gyazo.
+2. Update the `configuration.yaml` file with the correct parameters:
+    - `session_cookie`: Your Gyazo session cookie.
+    - `download_directory`: The directory where images will be saved.
+    - `images_per_request`: Number of images fetched per API request.
+    - `delay_between_requests`: Delay (in seconds) between consecutive requests to avoid hitting rate limits.
+    - `max_threads`: Maximum number of threads for concurrent downloads.
 
-```
+## Installing Dependencies
+
+1. Use pip to install the necessary libraries:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## Running the Script
+
+To run the downloader:
+
+```bash
 python main.py
 ```
-This will create all the images in a new directory ./images/
+
+Images will be downloaded to the specified directory in the `configuration.yaml` file (default: `./downloads/`).
+
+## Output
+
+The script provides console output for:
+
+- Current progress in terms of fetched images and pages.
+- Download status for each image.
+- Total number of images downloaded.
+- Breakdown of images by file type (e.g., PNG, GIF, MP4, etc.).

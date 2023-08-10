@@ -1,42 +1,79 @@
 import os
+import time
+import threading
+from collections import defaultdict
+import yaml
 import requests
-from gyazo import Api
-from yaml import safe_load
 
-def download_images(settings):
-    if 'token' not in settings or not settings['token']:
-        raise ValueError("Need to specify token in ./client.yml")
+# Load Configuration from YAML
+with open("configuration.yaml", 'r') as file:
+    config = yaml.safe_load(file)
 
-    client = Api(access_token=settings['token'])
-    images_dir = "./images"
-    os.makedirs(images_dir, exist_ok=True)
+DOWNLOAD_DIR = config['gyazo']['download_directory']
+MAX_THREADS = config['gyazo']['max_threads']
+IMAGES_PER_REQUEST = config['gyazo']['images_per_request']
+DELAY_BETWEEN_REQUESTS = config['gyazo']['delay_between_requests']
+SESSION_COOKIE = config['gyazo']['session_cookie']
 
-    for i in range(1, 10000):
-        images = client.get_image_list(per_page=100, page=i)
-        if not images:
-            break
+session = requests.Session()
 
-        for image in images:
-            if not image.url:
-                continue
-            r = requests.get(image.url, stream=True)
-            if r.status_code == 200:
-                img_path = os.path.join(images_dir, f"{image.image_id}.png")
-                if os.path.exists(img_path):
-                    print(f"Skipping image_id {image.image_id} as it already exists")
-                    continue
-                with open(img_path, "wb") as imgfile:
-                    print(f"Writing to file {image.image_id}.png")
-                    for chunk in r.iter_content(chunk_size=1024):
-                        if chunk:  # filter out keep-alive new chunks
-                            imgfile.write(chunk)
-            else:
-                print(f"Failed to download image: {image.url}")
+images = []
+page = 1
 
-def load_settings(file_path="./client.yml"):
-    with open(file_path, "r") as f:
-        return safe_load(f)
+while True:
+    print(f'[{page}] Fetching images...', end='', flush=True)
+    resp = session.get(
+        f'https://gyazo.com/api/images?page={page}&per_page={IMAGES_PER_REQUEST}', 
+        cookies={'Gyazo_session': SESSION_COOKIE}
+    )
+    
+    if not resp.json():
+        break
 
-if __name__ == '__main__':
-    settings = load_settings()
-    download_images(settings)
+    images.extend(resp.json())
+    page += 1
+    time.sleep(DELAY_BETWEEN_REQUESTS)
+    print(' done!')
+
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR)
+
+file_types = defaultdict(int)
+lock = threading.Lock()
+
+def download_image(image):
+    global file_types
+
+    url = image['url']
+    ext = url.split('.')[-1]
+
+    filename = f'{DOWNLOAD_DIR}/{image["image_id"]}.{ext}'
+
+    if not os.path.exists(filename):
+        time.sleep(DELAY_BETWEEN_REQUESTS)
+        resp = session.get(url)
+
+        with open(filename, 'wb') as f:
+            f.write(resp.content)
+
+        with lock:
+            file_types[ext] += 1
+            print(f"[Downloaded] {filename}")
+
+threads = []
+
+for image in images:
+    while threading.active_count() >= MAX_THREADS:
+        time.sleep(0.1)
+
+    thread = threading.Thread(target=download_image, args=[image])
+    threads.append(thread)
+    thread.start()
+
+for thread in threads:
+    thread.join()
+
+print('Download complete!')
+print(f'Total: {sum(file_types.values())}')
+for k, v in file_types.items():
+    print(f'{k}: {v}')
