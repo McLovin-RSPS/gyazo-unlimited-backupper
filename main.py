@@ -1,79 +1,69 @@
+import base64
+import filedate
+import json
 import os
-import time
-import threading
-from collections import defaultdict
-import yaml
 import requests
-
-# Load Configuration from YAML
-with open("configuration.yaml", 'r') as file:
-    config = yaml.safe_load(file)
-
-DOWNLOAD_DIR = config['gyazo']['download_directory']
-MAX_THREADS = config['gyazo']['max_threads']
-IMAGES_PER_REQUEST = config['gyazo']['images_per_request']
-DELAY_BETWEEN_REQUESTS = config['gyazo']['delay_between_requests']
-SESSION_COOKIE = config['gyazo']['session_cookie']
+from concurrent.futures import ThreadPoolExecutor
 
 session = requests.Session()
 
-images = []
-page = 1
+cookie = input("Enter Gyazo session cookie: ")
 
+images = []
+
+page = 1
 while True:
-    print(f'[{page}] Fetching images...', end='', flush=True)
-    resp = session.get(
-        f'https://gyazo.com/api/images?page={page}&per_page={IMAGES_PER_REQUEST}', 
-        cookies={'Gyazo_session': SESSION_COOKIE}
+    print(f"[{page}] Fetching images...", flush=True, end="")
+    
+    request = session.get(
+        f"https://gyazo.com/api/internal/images?page={page}&per=100",
+        cookies={"Gyazo_session": cookie}
     )
     
-    if not resp.json():
+    print(" done!", flush=True)
+
+    if request.text == "[]":
         break
 
-    images.extend(resp.json())
+    images += request.json()
+
     page += 1
-    time.sleep(DELAY_BETWEEN_REQUESTS)
-    print(' done!')
 
-if not os.path.exists(DOWNLOAD_DIR):
-    os.makedirs(DOWNLOAD_DIR)
-
-file_types = defaultdict(int)
-lock = threading.Lock()
+if not os.path.exists("downloads"):
+    os.makedirs("downloads")
 
 def download_image(image):
-    global file_types
+    jwt = image['alias_id']
+    url = image['non_cropped_thumb']['url']
+    metadata = image['metadata']
 
-    url = image['url']
-    ext = url.split('.')[-1]
+    payload = json.loads(base64.b64decode(jwt.split('.')[1] + "=="))
+    id = payload['img']
+    ext = url[-7:-4]
 
-    filename = f'{DOWNLOAD_DIR}/{image["image_id"]}.{ext}'
+    if "app" in metadata:
+        filename = f"downloads/{image['metadata']['app']}{id}.{ext}"
+    elif "title" in metadata:
+        filename = f"downloads/{image['metadata']['title']}{id}.{ext}"
+    else:
+        filename = f"downloads/{id}.{ext}"
 
     if not os.path.exists(filename):
-        time.sleep(DELAY_BETWEEN_REQUESTS)
-        resp = session.get(url)
+        request = session.get(f"https://thumb.gyazo.com/thumb/8192/{id}.{ext}")
 
-        with open(filename, 'wb') as f:
-            f.write(resp.content)
+        with open(filename, "wb") as file:
+            file.write(request.content)
 
-        with lock:
-            file_types[ext] += 1
-            print(f"[Downloaded] {filename}")
+        timestamp = image['created_at']
 
-threads = []
+        filedate.File(filename).set(
+            created = timestamp,
+            modified = timestamp
+        ) 
 
-for image in images:
-    while threading.active_count() >= MAX_THREADS:
-        time.sleep(0.1)
+    print("Done downloading image", id)
 
-    thread = threading.Thread(target=download_image, args=[image])
-    threads.append(thread)
-    thread.start()
-
-for thread in threads:
-    thread.join()
-
-print('Download complete!')
-print(f'Total: {sum(file_types.values())}')
-for k, v in file_types.items():
-    print(f'{k}: {v}')
+with ThreadPoolExecutor() as executor:
+    for count, image in enumerate(images, start=1):
+        print(f"Downloading image {count} of {len(images)}...", flush=True)
+        executor.submit(download_image, image)
