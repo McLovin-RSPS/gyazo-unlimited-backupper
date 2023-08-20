@@ -1,6 +1,0 @@
-gyazo:
-  download_directory: 'D:\gyazo-unlimited-backupper\images'
-  max_threads: 10
-  images_per_request: 100
-  delay_between_requests: 2.5
-  session_cookie: 'your_session_cookie'
