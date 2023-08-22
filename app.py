@@ -5,7 +5,6 @@ import json
 import os
 import requests
 import streamlit as st
-import time
 
 session = requests.Session()
 
@@ -34,8 +33,9 @@ def fetch_and_download_images(cookie, search_term):
             page += 1
 
     media_path = "media"
-    if not os.path.exists(media_path):
-        os.makedirs(media_path)
+    search_term_path = os.path.join(media_path, search_term)
+    if not os.path.exists(search_term_path):
+        os.makedirs(search_term_path)
 
     metadata_list = []
     log_data = []
@@ -58,7 +58,7 @@ def fetch_and_download_images(cookie, search_term):
             id = payload['img']
             ext = url[-7:-4]
 
-            directory = media_path + "/" + ext
+            directory = search_term_path + "/" + ext
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -74,7 +74,7 @@ def fetch_and_download_images(cookie, search_term):
                     request = session.get(f"https://thumb.gyazo.com/thumb/8192/{id}.{ext}")
                 except Exception as e:
                     st.error(f"An error occurred while downloading image: {e}")
-                    return
+                    # Do not return, continue with the next image
 
                 with open(filename, "wb") as file:
                     file.write(request.content)
@@ -90,12 +90,9 @@ def fetch_and_download_images(cookie, search_term):
 
             current_image += 1
             prog_bar.update(current_image / total_images)
-            
-            # Introduce delay between successive API requests to respect rate limits
-            time.sleep(0.5)
 
-    # Use ThreadPoolExecutor for parallel downloads
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    # Use ThreadPoolExecutor with 10 workers for parallel downloads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         executor.map(download_image, images)
 
     # Save metadata to a single text file
@@ -118,3 +115,4 @@ cookie = st.text_input("Enter Gyazo session cookie:")
 search_term = st.text_input("Enter a search term to filter media by metadata:")
 if st.button("Start Download"):
     fetch_and_download_images(cookie, search_term)
+    
