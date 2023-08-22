@@ -13,7 +13,7 @@ def fetch_and_download_images(cookie, search_term):
     images = []
     page = 1
     st.write(f"Fetching images using search term: {search_term}...")
-    
+
     with st.spinner("Fetching images..."):
         while True:
             try:
@@ -95,8 +95,8 @@ def fetch_and_download_images(cookie, search_term):
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         executor.map(download_image, images)
 
-    # Save metadata to a single text file
-    with open("metadata.txt", "w") as f:
+    # Save metadata to a single text file with utf-8 encoding
+    with open("metadata.txt", "w", encoding="utf-8") as f:
         for item in metadata_list:
             f.write("%s\n" % item)
 
@@ -115,4 +115,3 @@ cookie = st.text_input("Enter Gyazo session cookie:")
 search_term = st.text_input("Enter a search term to filter media by metadata:")
 if st.button("Start Download"):
     fetch_and_download_images(cookie, search_term)
-    
