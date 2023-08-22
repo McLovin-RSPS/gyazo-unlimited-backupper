@@ -1,23 +1,20 @@
 # gyazo-unlimited-backupper (Gyazo Media Downloader with Streamlit UI)
 
-
-
-
 This Python script provides a simple Streamlit-based UI to download media from Gyazo based on a search term in their metadata.
 
 ## Features
 
-- User-friendly UI with Streamlit.
-- Filter and download media based on metadata search.
-- Saves metadata for each downloaded image to a consolidated file (`metadata.txt`).
-- Maintains an operation log in `log.txt`.
-- Organizes different media types in separate directories within a `media` directory.
+* User-friendly UI with Streamlit.
+* Filter and download media based on metadata search.
+* Saves metadata for each downloaded image to a consolidated file (`metadata.txt`).
+* Maintains an operation log in `log.txt`.
+* Organizes different media types in separate directories within a `media` directory.
 
 ## Installation
 
 1. Clone the repository:
 
-```
+
 git clone https://github.com/McLovin-RSPS/gyazo-unlimited-backupper
 ```
 
@@ -39,7 +36,7 @@ pip install -r requirements.txt
 
 ```
 streamlit run app.py
-```
+
 
 2. Open the provided link in your browser.
 3. Enter the Gyazo session cookie and desired search term.
@@ -47,4 +44,8 @@ streamlit run app.py
 
 ## Note
 
-Make sure you have a valid Gyazo session cookie to use the script.
+* Make sure you have a valid Gyazo session cookie to use the script.
+* The script will create a `media` directory to store the downloaded media.
+* The script will also create a `metadata.txt` file to store the metadata for each downloaded image.
+* The script will also create a `log.txt` file to log the download progress and any errors that occur.
+

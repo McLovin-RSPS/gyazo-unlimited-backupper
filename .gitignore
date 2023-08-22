@@ -1,12 +1,8 @@
-# Python artifacts
 __pycache__/
 *.pyc
-*.pyo
-
-# Streamlit temporary files
-*.streamlit/
-
-# Downloaded media and logs
+*.egg-info/
+dist/
+build/
 media/
 metadata.txt
 log.txt

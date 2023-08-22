@@ -1,10 +1,11 @@
 import base64
+import concurrent.futures
 import filedate
 import json
 import os
 import requests
 import streamlit as st
-from tqdm import tqdm
+import time
 
 session = requests.Session()
 
@@ -16,10 +17,14 @@ def fetch_and_download_images(cookie, search_term):
     
     with st.spinner("Fetching images..."):
         while True:
-            request = session.get(
-                f"https://gyazo.com/api/internal/images?page={page}&per=100",
-                cookies={"Gyazo_session": cookie}
-            )
+            try:
+                request = session.get(
+                    f"https://gyazo.com/api/internal/images?page={page}&per=100",
+                    cookies={"Gyazo_session": cookie}
+                )
+            except Exception as e:
+                st.error(f"An error occurred while fetching images: {e}")
+                return
 
             if request.text == "[]":
                 break
@@ -39,7 +44,9 @@ def fetch_and_download_images(cookie, search_term):
     current_image = 1
     prog_bar = st.progress(0)
 
-    for image in tqdm(images):
+    def download_image(image):
+        nonlocal current_image
+
         metadata = image['metadata']
 
         # Check if search term is in metadata
@@ -63,7 +70,11 @@ def fetch_and_download_images(cookie, search_term):
                 filename = f"{directory}/{id}.{ext}"
 
             if not os.path.exists(filename):
-                request = session.get(f"https://thumb.gyazo.com/thumb/8192/{id}.{ext}")
+                try:
+                    request = session.get(f"https://thumb.gyazo.com/thumb/8192/{id}.{ext}")
+                except Exception as e:
+                    st.error(f"An error occurred while downloading image: {e}")
+                    return
 
                 with open(filename, "wb") as file:
                     file.write(request.content)
@@ -79,6 +90,13 @@ def fetch_and_download_images(cookie, search_term):
 
             current_image += 1
             prog_bar.update(current_image / total_images)
+            
+            # Introduce delay between successive API requests to respect rate limits
+            time.sleep(0.5)
+
+    # Use ThreadPoolExecutor for parallel downloads
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        executor.map(download_image, images)
 
     # Save metadata to a single text file
     with open("metadata.txt", "w") as f:
