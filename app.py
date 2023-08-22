@@ -4,6 +4,7 @@ import json
 import os
 import requests
 import streamlit as st
+from tqdm import tqdm
 
 session = requests.Session()
 
@@ -13,18 +14,19 @@ def fetch_and_download_images(cookie, search_term):
     page = 1
     st.write(f"Fetching images using search term: {search_term}...")
     
-    while True:
-        request = session.get(
-            f"https://gyazo.com/api/internal/images?page={page}&per=100",
-            cookies={"Gyazo_session": cookie}
-        )
+    with st.spinner("Fetching images..."):
+        while True:
+            request = session.get(
+                f"https://gyazo.com/api/internal/images?page={page}&per=100",
+                cookies={"Gyazo_session": cookie}
+            )
 
-        if request.text == "[]":
-            break
+            if request.text == "[]":
+                break
 
-        images += request.json()
+            images += request.json()
 
-        page += 1
+            page += 1
 
     media_path = "media"
     if not os.path.exists(media_path):
@@ -33,8 +35,11 @@ def fetch_and_download_images(cookie, search_term):
     metadata_list = []
     log_data = []
 
-    count = 1
-    for image in images:
+    total_images = len(images)
+    current_image = 1
+    prog_bar = st.progress(0)
+
+    for image in tqdm(images):
         metadata = image['metadata']
 
         # Check if search term is in metadata
@@ -72,7 +77,8 @@ def fetch_and_download_images(cookie, search_term):
                 metadata_list.append(metadata)
                 log_data.append(f"Downloaded: {filename}")
 
-            count += 1
+            current_image += 1
+            prog_bar.update(current_image / total_images)
 
     # Save metadata to a single text file
     with open("metadata.txt", "w") as f:
@@ -84,7 +90,7 @@ def fetch_and_download_images(cookie, search_term):
         for log_item in log_data:
             f.write("%s\n" % log_item)
 
-    st.write(f"Downloaded {count} images based on the search term.")
+    st.write(f"Downloaded {current_image} images based on the search term.")
 
 # Streamlit UI
 st.title("Gyazo Media Downloader")

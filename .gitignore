@@ -1,0 +1,12 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Streamlit temporary files
+*.streamlit/
+
+# Downloaded media and logs
+media/
+metadata.txt
+log.txt
