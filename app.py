@@ -10,7 +10,7 @@ session = requests.Session()
 
 # Define function to fetch and download images
 def fetch_and_download_images(cookie, search_term):
-    images = []
+    images = set()
     page = 1
     st.write(f"Fetching images using search term: {search_term}...")
 
@@ -28,21 +28,20 @@ def fetch_and_download_images(cookie, search_term):
             if request.text == "[]":
                 break
 
-            images += request.json()
+            images.update(request.json())
 
             page += 1
 
     media_path = "media"
     search_term_path = os.path.join(media_path, search_term)
-    if not os.path.exists(search_term_path):
-        os.makedirs(search_term_path)
+    os.makedirs(search_term_path, exist_ok=True)
 
-    metadata_list = []
-    log_data = []
+    metadata_dict = {}
+    log_dict = {}
 
     total_images = len(images)
     current_image = 1
-    prog_bar = st.progress(0)
+    prog_bar = st.empty()
 
     def download_image(image):
         nonlocal current_image
@@ -56,54 +55,56 @@ def fetch_and_download_images(cookie, search_term):
 
             payload = json.loads(base64.b64decode(jwt.split('.')[1] + "=="))
             id = payload['img']
-            ext = url[-7:-4]
+            ext = os.path.splitext(url)[1]
 
-            directory = search_term_path + "/" + ext
-            if not os.path.exists(directory):
-                os.makedirs(directory)
+            directory = os.path.join(search_term_path, ext)
+            os.makedirs(directory, exist_ok=True)
 
             if "app" in metadata:
-                filename = f"{directory}/{metadata['app']}{id}.{ext}"
+                filename = f"{metadata['app']}{id}.{ext}"
             elif "title" in metadata:
-                filename = f"{directory}/{metadata['title']}{id}.{ext}"
+                filename = f"{metadata['title']}{id}.{ext}"
             else:
-                filename = f"{directory}/{id}.{ext}"
+                filename = f"{id}.{ext}"
 
-            if not os.path.exists(filename):
+            filepath = os.path.join(directory, filename)
+
+            if not os.path.exists(filepath):
                 try:
                     request = session.get(f"https://thumb.gyazo.com/thumb/8192/{id}.{ext}")
                 except Exception as e:
                     st.error(f"An error occurred while downloading image: {e}")
                     # Do not return, continue with the next image
 
-                with open(filename, "wb") as file:
+                with open(filepath, "wb") as file:
                     file.write(request.content)
 
                 timestamp = image['created_at']
-                filedate.File(filename).set(
+                filedate.File(filepath).set(
                     created=timestamp,
                     modified=timestamp
                 )
 
-                metadata_list.append(metadata)
-                log_data.append(f"Downloaded: {filename}")
+                metadata_dict[filepath] = metadata
+                log_dict[filepath] = f"Downloaded: {filename}"
 
             current_image += 1
-            prog_bar.update(current_image / total_images)
+            prog_bar.progress(current_image / total_images)
 
     # Use ThreadPoolExecutor with 10 workers for parallel downloads
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        executor.map(download_image, images)
+        futures = [executor.submit(download_image, image) for image in images]
+
+        for future in concurrent.futures.as_completed(futures):
+            pass
 
     # Save metadata to a single text file with utf-8 encoding
     with open("metadata.txt", "w", encoding="utf-8") as f:
-        for item in metadata_list:
-            f.write("%s\n" % item)
+        json.dump(metadata_dict, f, ensure_ascii=False)
 
     # Save log data to log.txt
-    with open("log.txt", "w") as f:
-        for log_item in log_data:
-            f.write("%s\n" % log_item)
+    with open("log.txt", "w", encoding="utf-8") as f:
+        json.dump(log_dict, f, ensure_ascii=False)
 
     st.write(f"Downloaded {current_image} images based on the search term.")
 
